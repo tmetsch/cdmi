@@ -31,7 +31,6 @@ class TestCDMIContainer(unittest.TestCase):
             auth_method = 'http://'
         auth_host = (self.conf.get('auth_host') + ':' +
                     self.conf.get('auth_port'))
-                     self.conf.get('auth_port'))
         auth_url = (auth_method + auth_host +
                     self.conf.get('auth_prefix') + 'v1.0')
         try:
@@ -50,6 +49,7 @@ class TestCDMIContainer(unittest.TestCase):
                                          self.conf.get('cdmi_capability_id',
                                                        'cdmi_capabilities') +
                                          '/' + pieces[2])
+
             #Setup two container names
             suffix = format(time.time(), '.6f')
             self.child_container = "cdmi_test_child_container_" + suffix
