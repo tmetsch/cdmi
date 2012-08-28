@@ -16,9 +16,14 @@
 import unittest
 from test import get_config
 from swiftclient.client import get_auth
+from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
+from email.MIMEBase import MIMEBase
 import httplib
 import time
 import json
+import base64
+import os
 
 
 class TestCDMIObject(unittest.TestCase):
@@ -54,6 +59,7 @@ class TestCDMIObject(unittest.TestCase):
             self.top_container = 'cdmi_test_top_container_' + suffix
             self.child_container = 'cdmi_test_child_container_' + suffix
             self.object_create = 'cdmi_test_object_create_' + suffix
+            self.object_copy = 'cdmi_test_object_copy_' + suffix
             self.object_test = 'cdmi_test_object_' + suffix
 
             #Create test containers
@@ -78,6 +84,9 @@ class TestCDMIObject(unittest.TestCase):
         self.__delete_test_entity(self.top_container + '/' +
                                   self.child_container + '/' +
                                   self.object_create)
+        self.__delete_test_entity(self.top_container + '/' +
+                                  self.child_container + '/' +
+                                  self.object_copy)
         self.__delete_test_entity(self.top_container + '/' +
                                   self.child_container)
         self.__delete_test_entity(self.top_container + '/a/b/c/real_object')
@@ -143,6 +152,396 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectName found which is required.')
         self.assertIsNotNone(body['objectType'],
                              'Not objectType found which is required.')
+
+    def test_create_object_cdmi_multipart(self):
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object',
+                   'Content-Type': 'multipart/mixed'}
+        msg = MIMEMultipart()
+        # create the first part which contains cdmi json metadata
+        body = {}
+        body['metadata'] = {'key1': 'value1', 'key2': 'value2'}
+        part = MIMEBase('application', 'cdmi-object')
+        part.set_payload(json.dumps(body, indent=2))
+        msg.attach(part)
+        # add an image as an attachment
+        path = os.path.dirname(__file__)
+        fp = open('/'.join([path, 'desert.jpg']), 'rb')
+        part = MIMEImage(fp.read())
+        msg.attach(part)
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create),
+                     msg.as_string(), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201, 'Multipart Object creation failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+        except Exception as parsing_error:
+            raise parsing_error
+        self.assertIsNotNone(body['parentURI'],
+                             'Not parentURI found which is required.')
+        self.assertIsNotNone(body['objectName'],
+                             'Not objectName found which is required.')
+        self.assertIsNotNone(body['objectType'],
+                             'Not objectType found which is required.')
+        conn.close()
+
+        # now read the object and make sure everything is correct.
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token}
+        conn.request('GET', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create), None, headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 200, 'Object read failed')
+        self.assertEquals('image/jpeg', res.getheader('content-type', ''),
+                          'The content type should be image/jpeg')
+        conn.close()
+
+    def test_create_object_non_cdmi_multipart(self):
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'Content-Type': 'multipart/mixed'}
+        msg = MIMEMultipart()
+        # add an image as an attachment
+        path = os.path.dirname(__file__)
+        fp = open('/'.join([path, 'desert.jpg']), 'rb')
+        part = MIMEImage(fp.read())
+        msg.attach(part)
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create),
+                     msg.as_string(), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201, 'Multipart Object creation failed')
+
+        conn.close()
+        # now read the object and make sure everything is correct.
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object'}
+        conn.request('GET', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create), None, headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 200,
+                         'Read multipart uploaded object failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+        except Exception as parsing_error:
+            raise parsing_error
+        self.assertIsNotNone(body['parentURI'],
+                             'Not parentURI found which is required.')
+        self.assertIsNotNone(body['objectName'],
+                             'Not objectName found which is required.')
+        self.assertIsNotNone(body['objectType'],
+                             'Not objectType found which is required.')
+        self.assertEquals('image/jpeg', body['mimetype'],
+                          'The mime type should be image/jpeg')
+        conn.close()
+
+    def test_copy_object_same_dir(self):
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object',
+                   'Content-Type': 'application/cdmi-object'}
+        body = {}
+        body['copy'] = '/'.join(['', self.top_container, self.child_container,
+                                self.object_test])
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_copy),
+                     json.dumps(body, indent=2), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201, 'Object copy failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+        except Exception as parsing_error:
+            raise parsing_error
+        self.assertIsNotNone(body['parentURI'],
+                             'Not parentURI found which is required.')
+        self.assertIsNotNone(body['objectName'],
+                             'Not objectName found which is required.')
+        self.assertIsNotNone(body['objectType'],
+                             'Not objectType found which is required.')
+
+    def test_copy_object_different_dir(self):
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object',
+                   'Content-Type': 'application/cdmi-object'}
+        body = {}
+        body['copy'] = '/'.join(['', self.top_container, 'a/b/cc'])
+
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_copy),
+                     json.dumps(body, indent=2), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201, 'Object copy failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+        except Exception as parsing_error:
+            raise parsing_error
+        self.assertIsNotNone(body['parentURI'],
+                             'Not parentURI found which is required.')
+        self.assertIsNotNone(body['objectName'],
+                             'Not objectName found which is required.')
+        self.assertIsNotNone(body['objectType'],
+                             'Not objectType found which is required.')
+
+    def test_copy_object_non_exist(self):
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object',
+                   'Content-Type': 'application/cdmi-object'}
+        body = {}
+        body['copy'] = '/'.join(['', self.top_container, 'a/b/non_exist'])
+
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_copy),
+                     json.dumps(body, indent=2), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 404,
+                         'Non exist object copy should have failed')
+
+    def test_handle_base64_object(self):
+        # create a new object using base64 encoded data
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object',
+                   'Content-Type': 'application/cdmi-object'}
+        body = {}
+        body['metadata'] = {'key1': 'value1', 'key2': 'value2'}
+        body['mimetype'] = 'text/plain'
+        body['valuetransferencoding'] = 'base64'
+        original_value = base64.encodestring('value of the object')
+        body['value'] = original_value
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create),
+                     json.dumps(body, indent=2), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201,
+                         'Base64 encoded value object creation failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+        except Exception as parsing_error:
+            raise parsing_error
+        self.assertIsNotNone(body['parentURI'],
+                             'Not parentURI found which is required.')
+        self.assertIsNotNone(body['objectName'],
+                             'Not objectName found which is required.')
+        self.assertIsNotNone(body['objectType'],
+                             'Not objectType found which is required.')
+        conn.close()
+
+        # read the object just created.
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object'}
+        conn.request('GET', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create), None, headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 200,
+                         'Base64 encoded value object read failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+            encoding = body['valuetransferencoding']
+            value = body['value']
+        except Exception as parsing_error:
+            raise parsing_error
+
+        self.assertEquals(encoding, 'base64', 'Encoding is not base64')
+        self.assertEquals(value, original_value,
+                      'encoded value does not match original')
+        conn.close()
+
+    def test_large_data_upload_cdmi(self):
+        # create the first request
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'X-CDMI-UploadID': 'test_l_id_01',
+                   'X-CDMI-Partial': 'true',
+                   'Accept': 'application/cdmi-object',
+                   'Content-Type': 'application/cdmi-object'}
+        body = {}
+        body['metadata'] = {'key1': 'value1', 'key2': 'value2'}
+        body['mimetype'] = 'text/plain'
+        body['valuetransferencoding'] = 'base64'
+        value1 = 'value1'
+        original_value = base64.encodestring(value1)
+        headers['Content-Range'] = 'bytes=0-' + str(len(value1))
+        body['value'] = original_value
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create),
+                     json.dumps(body, indent=2), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201,
+                         'The first part object creation failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+        except Exception as parsing_error:
+            raise parsing_error
+        self.assertIsNotNone(body['parentURI'],
+                             'Not parentURI found which is required.')
+        self.assertIsNotNone(body['objectName'],
+                             'Not objectName found which is required.')
+        self.assertIsNotNone(body['objectType'],
+                             'Not objectType found which is required.')
+        conn.close()
+
+        # create the second request
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'X-CDMI-UploadID': 'test_l_id_01',
+                   'X-CDMI-Partial': 'false;count=2',
+                   'Accept': 'application/cdmi-object',
+                   'Content-Type': 'application/cdmi-object'}
+        body = {}
+        body['metadata'] = {'key1': 'value1', 'key2': 'value2'}
+        body['mimetype'] = 'text/plain'
+        body['valuetransferencoding'] = 'base64'
+        value2 = 'value2 and value2'
+        original_value = base64.encodestring(value2)
+        headers['Content-Range'] = 'bytes='+ str(len(value1)) + '-' + \
+                                str(len(value1) + len(value2))
+        body['value'] = original_value
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create),
+                     json.dumps(body, indent=2), headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201,
+                         'second part object creation failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+        except Exception as parsing_error:
+            raise parsing_error
+        self.assertIsNotNone(body['parentURI'],
+                             'Not parentURI found which is required.')
+        self.assertIsNotNone(body['objectName'],
+                             'Not objectName found which is required.')
+        self.assertIsNotNone(body['objectType'],
+                             'Not objectType found which is required.')
+        conn.close()
+
+        # read the object just created.
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-object'}
+        conn.request('GET', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create), None, headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 200,
+                         'multi request uploaded value object read failed')
+        data = res.read()
+        try:
+            body = json.loads(data)
+            encoding = body['valuetransferencoding']
+            value = body['value']
+        except Exception as parsing_error:
+            raise parsing_error
+
+        self.assertEquals(encoding, 'base64', 'Encoding is not base64')
+        value = base64.decodestring(value)
+        self.assertEquals(value, value1 + value2,
+                      'retrieved value does not match original')
+        conn.close()
+
+    def test_large_data_upload_non_cdmi(self):
+        # create the first request
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-UploadID': 'test_l_id_01',
+                   'Content-Type': 'text/plain',
+                   'X-CDMI-Partial': 'true'}
+
+        body = {}
+        value1 = 'value1'
+        headers['Content-Range'] = 'bytes=0-' + str(len(value1))
+        body = value1
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create),
+                     body, headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201,
+                         'The first part object creation failed')
+        conn.close()
+
+        # create the second request
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token,
+                   'X-CDMI-UploadID': 'test_l_id_01',
+                   'X-CDMI-Partial': 'false;count=2',
+                   'Content-Type': 'text/plain'}
+        value2 = 'value2 and value2'
+        headers['Content-Range'] = 'bytes='+ str(len(value1)) + '-' + \
+                                str(len(value1) + len(value2))
+        body = value2
+        conn.request('PUT', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create),
+                     body, headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201,
+                         'second part object creation failed')
+        conn.close()
+
+        # read the object just created.
+        conn = httplib.HTTPConnection(self.conf.get('auth_host'),
+                                      self.conf.get('auth_port'))
+        headers = {'X-Auth-Token': self.auth_token}
+        conn.request('GET', (self.access_root + '/' + self.top_container +
+                             '/' + self.child_container + '/' +
+                             self.object_create), None, headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 200,
+                         'multi request uploaded value object read failed')
+        data = res.read()
+
+        self.assertEquals(data, value1 + value2,
+                      'retrieved value does not match original')
+        conn.close()
 
     def test_create_object_with_empty_body(self):
         conn = httplib.HTTPConnection(self.conf.get('auth_host'),

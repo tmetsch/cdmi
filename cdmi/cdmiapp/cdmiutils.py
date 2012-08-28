@@ -17,8 +17,10 @@
 # none-cdmi controllers
 
 from cdmibase import Consts
-from swift.common.bufferedhttp import http_connect_raw
+from swift.common.bufferedhttp import http_connect_raw, BufferedHTTPConnection
 from webob import Request, Response
+
+from eventlet.green.httplib import HTTPConnection
 
 
 def get_err_response(code):
@@ -56,6 +58,10 @@ def get_err_response(code):
             (400, 'The storage state is inconsistant.'),
         'VersionNotSupported':
             (400, 'Requested cdmi version is not supported.'),
+        'InvalidRange':
+            (400, 'Requested Range is not valid.'),
+        'InvalidBody':
+            (400, 'MIME message or the request body can not be parsed.'),
         'NoSuchContainer':
             (404, 'The specified container does not exist'),
         'ResourceIsNotObject':
@@ -68,8 +74,12 @@ def get_err_response(code):
             (409, 'The requested name already exists as a different type')}
 
     resp = Response()
-    resp.status = error_table[code][0]
-    resp.body = error_table[code][1]
+    if error_table.get(code):
+        resp.status = error_table[code][0]
+        resp.body = error_table[code][1]
+    else:
+        resp.status = 400
+        resp.body = 'Unknown Error'
     return resp
 
 
@@ -103,7 +113,7 @@ def check_resource(env, method, path, logger, get_body=False,
     headers = {}
     headers[Consts.AUTH_TOKEN] = value if value != '' else key
     headers['Accept'] = 'application/json'
-    method = 'HEAD' if not method else method
+    method = 'GET' if not method else method
     path = req.path if not path else path
     path = path.rstrip('/')
 
@@ -136,3 +146,37 @@ def check_resource(env, method, path, logger, get_body=False,
             values[header[0]] = header[1]
         conn.close()
         return True, values, None
+
+
+def send_manifest(env, method, path, logger, extra_header, get_body=False,
+                   query_string=None):
+    """
+    Use this method to send header against a resource already exist.
+    """
+
+    # Create a new Request
+    req = Request(env)
+    ssl = True if req.scheme.lower() == 'https' else False
+
+    # Fixup the auth token, for some reason, the auth token padded the user
+    # account at the front with a comma. We need to get rid of it, otherwise,
+    # the auth token will be considered invalid.
+    key, sep, value = req.headers[Consts.AUTH_TOKEN].partition(',')
+    headers = {}
+    headers[Consts.AUTH_TOKEN] = value if value != '' else key
+    headers['Content-Length'] = '0'
+    extra_header.update(headers)
+    path = path.rstrip('/')
+
+    if ssl:
+        conn = HTTPSConnection('%s:%s' % (req.server_name,
+                                          req.server_portport))
+    else:
+        conn = BufferedHTTPConnection('%s:%s' % (req.server_name,
+                                                 req.server_port))
+
+    conn.request('PUT', path, '', extra_header)
+
+    res = conn.getresponse()
+
+    return res

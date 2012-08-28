@@ -7,8 +7,10 @@ Setup
 =====
 
 1. Install [Openstack with Swift](http://docs.openstack.org/essex/openstack-object-storage/admin/content/)
-2. Install this python egg: `python setup.py install`
-3. Configure Swift:
+2. Grab the code from github:
+     `git clone http://github.com/osaddon/cdmi`
+3. Install this python egg: `sudo python setup.py install`
+4. Configure Swift:
 
 In `/etc/swift/proxy-server.conf`, add cdmi filter before proxy-server
 
@@ -56,4 +58,3 @@ Query the capabilites of a Container:
 Add an Object to a Container:
 
     curl -v -X PUT -H 'X-Auth-Token: AUTH_tk56b01c82710b41328db7c9f953d3933d' -H 'X-CDMI-Specification-Version: 1.0.1' -H 'Accept: application/cdmi-object' -H 'Content-Type: application/cdmi-object' http://127.0.0.1:8080/v1/AUTH_test/<container_name>/<object_name> -d '<Some JSON>'
-    

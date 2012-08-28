@@ -38,7 +38,7 @@ class NonCDMIContainerController(CDMIBaseController):
         path = '/' + concat_parts('v1', self.account_name, self.container_name,
                                   self.parent_name, self.object_name)
 
-        exists, headers, body = check_resource(env, 'HEAD', path,
+        exists, headers, body = check_resource(env, 'GET', path,
                                                self.logger, False)
 
         if exists:
@@ -70,7 +70,7 @@ class NonCDMIObjectController(CDMIBaseController):
         path = '/' + concat_parts('v1', self.account_name, self.container_name,
                                   self.parent_name, self.object_name)
 
-        exists, headers, body = check_resource(env, 'HEAD', path, self.logger,
+        exists, headers, body = check_resource(env, 'GET', path, self.logger,
                                                False, None)
 
         if exists:
@@ -106,10 +106,23 @@ class NonCDMIObjectController(CDMIBaseController):
         if res:
             return res
 
-        # Create a new WebOb Request object according to the current request
-        req = Request(env)
+        try:
+            self._handle_part(env)
+        except Exception as ex:
+            return get_err_response(ex.message)
 
-        if not req.body or len(req.body) == 0:
-            req.headers['content-length'] = '0'
-        res = req.get_response(self.app)
-        return res
+        try:
+            body = self._handle_body(env, False)
+        except Exception as ex:
+            return get_err_response('InvalidBody')
+        else:
+            env['CONTENT_TYPE'] = body.get('mimetype', 'text/plain')
+            req = Request(env)
+            req.body = body.get('value', '')
+            req.headers['content-length'] = len(req.body)
+            res = req.get_response(self.app)
+            if (res.status_int in [201, 204] and
+                env.get('HTTP_X_USE_EXTRA_REQUEST')):
+                extra_res = self._put_manifest(env)
+                res.status_int = extra_res.status
+            return res

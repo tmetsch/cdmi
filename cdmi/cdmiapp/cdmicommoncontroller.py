@@ -16,10 +16,13 @@
 from cdmibase import \
     (Consts, Controller, concat_parts)
 from cdmiutils import \
-    (get_pair_from_header, get_err_response, check_resource)
+    (get_pair_from_header, get_err_response, check_resource, send_manifest)
 from webob import Request, Response
 from swift.common.utils import get_logger
 import json
+import base64
+import email
+import mimetypes
 
 
 class CDMIBaseController(Controller):
@@ -70,7 +73,7 @@ class CDMIBaseController(Controller):
             # Try to hit the resource url and see if it exists
             path = '/' + concat_parts('v1', self.account_name,
                                       self.container_name, self.parent_name)
-            exists, headers, dummy = check_resource(env, 'HEAD',
+            exists, headers, dummy = check_resource(env, 'GET',
                                                     path, self.logger)
             if exists:
                 content_type = str(headers.get('content-type', ''))
@@ -118,7 +121,7 @@ class CDMIBaseController(Controller):
         """
         path = env['PATH_INFO']
         res, is_container, headers, children = None, False, {}, None
-        exists, headers, dummy = check_resource(env, 'HEAD', path, self.logger)
+        exists, headers, dummy = check_resource(env, 'GET', path, self.logger)
         # If exists, we need to check if the resource is a container
         if exists:
             content_type = (headers.get('content-type') or '').lower()
@@ -167,9 +170,118 @@ class CDMIBaseController(Controller):
             else:
                 res = get_err_response('NoSuchKey')
 
-        self.logger.info('is_container=' + str(is_container))
-        self.logger.info(res)
         return res, is_container, headers, children
+
+    def _handle_body(self, env, is_cdmi_type=False):
+        '''
+        this method will parse the multipart message and return one object
+           body = {'value': 'some value', 'mimetype': content_type}
+        if the request body is not multipart, then for cdmi content request
+        this method will parse the body as json. for non cdmi content request
+        this method will simply make a body object with the value being
+        the request body and the mimetype being the content type
+        '''
+        body = {}
+        req = Request(env)
+        content_type = (req.headers['Content-Type'] or '').lower()
+        # multipart
+        if content_type.find('multipart/mixed') >= 0:
+            try:
+                message = email.message_from_file(req.body_file)
+                for i, part in enumerate(message.walk()):
+                    if i > 0:
+                        content_type = part.get_content_type() or ''
+                        if (content_type.find('cdmi-object') > 0 and
+                            is_cdmi_type):
+                            payload = part.get_payload(decode=True)
+                            body.update(json.loads(payload))
+                        else:
+                            body['value'] = part.get_payload(decode=True)
+                            body['mimetype'] = content_type
+            except Exception as ex:
+                raise ex
+        # not multipart
+        elif is_cdmi_type:
+            body = json.loads(req.body)
+            body['mimetype'] = body.get('mimetype', content_type)
+        else:
+            body['value'] = req.body
+            body['mimetype'] = content_type
+
+        return body
+
+    def _handle_part(self, env):
+        '''
+        This method will inspect if the request is part of a series of
+        a large data object upload. inspect the headers such as
+        X-Object-UploadID, X-CDMI-Partial, Content-Range
+        '''
+
+        try:
+            upload_id = env.get('HTTP_X_CDMI_UPLOADID')
+            cdmi_partial = (env.get('HTTP_X_CDMI_PARTIAL') or '').lower()
+            content_range = (env.get('HTTP_CONTENT_RANGE') or '').lower()
+            if upload_id and cdmi_partial:
+                start, end = self._get_range(content_range)
+                if start:
+                    new_name = self.object_name + '_segments/'
+                    new_name += upload_id + '/' + start
+                    new_name += '-' + end if end else ''
+                    env['PATH_INFO'] = \
+                        '/v1/' + concat_parts(self.account_name,
+                                              self.container_name,
+                                              self.parent_name, new_name)
+
+                if cdmi_partial.find('false') >= 0:
+                    new_name = self.object_name + '_segments/' + upload_id
+                    new_name += '/'
+                    env['HTTP_X_OBJECT_MANIFEST'] = \
+                        concat_parts(self.container_name,
+                                     self.parent_name, new_name)
+                    #only when there is a content and cdmi_partial is false
+                    #two requests are needed
+                    if start:
+                        env['HTTP_X_USE_EXTRA_REQUEST'] = 'true'
+
+        except Exception as ex:
+            raise ex
+
+    def _put_manifest(self, env):
+        '''
+        This method will send the manifest request
+        '''
+        if env.get('HTTP_X_OBJECT_MANIFEST'):
+            path = '/v1/' + concat_parts(self.account_name,
+                                        self.container_name,
+                                        self.parent_name,
+                                        self.object_name)
+            extra_header = {}
+            extra_header['X-OBJECT-MANIFEST'] = \
+                env.get('HTTP_X_OBJECT_MANIFEST')
+            return send_manifest(env, 'PUT', path, self.logger, extra_header)
+
+    def _get_range(self, header_value, valid_units=('bytes', 'none')):
+        """Parses the value of an HTTP Range: header.
+        The value of the header as a string should be passed in; without
+        the header name itself.
+        Returns a range object.
+        """
+        if header_value and len(header_value.strip()) > 0:
+            parts = header_value.split('=')
+            if parts[0] != 'bytes' or len(parts) != 2:
+                raise Exception('InvalidRange')
+            # further split and get the range
+            parts = parts[1].split('-')
+            if len(parts) < 1 or len(parts) > 2:
+                raise Excetpion('InvalidRange')
+            start = '%020d' % int(parts[0])
+            if len(parts) == 2:
+                end = '%020d' % int(parts[1])
+            else:
+                end = None
+            return start, end
+        else:
+            return None, None
 
 
 class CDMICommonController(CDMIBaseController):
@@ -268,10 +380,15 @@ class CDMICommonController(CDMIBaseController):
         # Handling CDMI metadata
         body['metadata'] = self._process_metadata(headers)
         body['mimetype'] = headers.get('content-type', '')
-        body['valuetransferencoding'] = \
-            headers.get(Consts.VALUE_ENCODING, 'utf-8')
+        encoding = headers.get(Consts.VALUE_ENCODING, 'utf-8')
+        body['valuetransferencoding'] = encoding
+        if (encoding.lower() == Consts.ENCODING_BASE64 or
+            'text/' not in body['mimetype']):
+            body['valuetransferencoding'] = Consts.ENCODING_BASE64
+            body['value'] = base64.encodestring(object_body)
+        else:
+            body['value'] = object_body
         body['valuerange'] = '0-' + str(len(object_body))
-        body['value'] = object_body
         res.body = json.dumps(body, indent=2)
         res.status_int = 200
 

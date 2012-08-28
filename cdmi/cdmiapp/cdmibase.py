@@ -40,6 +40,8 @@ class Consts(object):
     META_CONTAINER_ID = 'x-container-meta-cdmi-'
     META_OBJECT_ID = 'x-object-meta-cdmi-'
     VALUE_ENCODING = 'x-object-meta-valuetransferencoding'
+    ENCODING_BASE64 = 'base64'
+    MULTIPART_TYPE = 'multipart/mixed'
 
 
 class Controller(object):
@@ -160,8 +162,6 @@ class AccountController(Controller):
         # Create a new WebOb Request object according to the current request
         req = Request(env)
         # if cdmi content, then we return response in cdmi format
-	self.logger.info("account")
-        self.logger.info(req.headers.get(Consts.CDMI_VERSION, False))
         if req.headers.get(Consts.CDMI_VERSION, False):
             accept_header = req.headers.get('accept', '')
             if accept_header.find(Consts.CDMI_APP_CAPABILITY) >= 0:

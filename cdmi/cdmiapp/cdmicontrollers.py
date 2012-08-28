@@ -25,6 +25,7 @@ from swift.common.utils import get_logger
 from swift.common.utils import split_path
 from swift.common.bufferedhttp import http_connect_raw
 import json
+import base64
 
 
 class ContainerController(CDMIBaseController):
@@ -42,7 +43,7 @@ class ContainerController(CDMIBaseController):
         # First check if the resource exists and if it is a directory
         path = '/' + concat_parts('v1', self.account_name, self.container_name,
                                   self.parent_name, self.object_name)
-        exists, headers, dummy = check_resource(env, 'HEAD', path,
+        exists, headers, dummy = check_resource(env, 'GET', path,
                                                 self.logger, False)
         if exists:
             content_type = headers.get('content-type', '')
@@ -118,7 +119,7 @@ class ObjectController(CDMIBaseController):
     Handles requests for create and update of objects
     """
 
-    # Use PUT to handle container update and create
+    # Use PUT to handle object update and create
     def PUT(self, env, start_response):
         """
         Handle Container update and create request
@@ -126,7 +127,7 @@ class ObjectController(CDMIBaseController):
         # First check if the resource exists and if it is a directory
         path = '/' + concat_parts('v1', self.account_name, self.container_name,
                                   self.parent_name, self.object_name)
-        exists, headers, body = check_resource(env, 'HEAD', path, self.logger,
+        exists, headers, body = check_resource(env, 'GET', path, self.logger,
                                                False, None)
         if exists:
             content_type = headers.get('content-type', '')
@@ -159,34 +160,54 @@ class ObjectController(CDMIBaseController):
             return res
 
         # Create a new WebOb Request object according to the current request
+        #if we found X-Object-UploadID in the header, we need know that
+        #the request is uploading a piece of a large object, the piece
+        #will need to go to the segments folder
+
+        try:
+            self._handle_part(env)
+        except Exception as ex:
+            return get_err_response(ex.message)
+
         req = Request(env)
 
         metadata = {}
         if req.body:
             try:
-                body = json.loads(req.body)
-            except ValueError:
-                return get_err_response('InvalidContent')
+                body = self._handle_body(env, True)
+            except Exception:
+                return get_err_response('InvalidBody')
 
-            if body.get('metadata'):
-                metadata = body['metadata']
-                for key in metadata:
-                    if metadata[key] == '':
-                        req.headers[Consts.META_OBJECT_ID + key] = ''
-                    else:
-                        req.headers[Consts.META_OBJECT_ID + key] = \
-                            key + ":" + str(metadata[key])
+            # headling copy object
+            if body.get('copy'):
+                # add the copy-from header to indicate a copy operation
+                # for swift
+                req.headers['X-Copy-From'] = body.get('copy')
+                req.body = ''
             else:
-                metadata = {}
+                if body.get('metadata'):
+                    metadata = body['metadata']
+                    for key in metadata:
+                        if metadata[key] == '':
+                            req.headers[Consts.META_OBJECT_ID + key] = ''
+                        else:
+                            req.headers[Consts.META_OBJECT_ID + key] = \
+                                key + ":" + str(metadata[key])
+                else:
+                    metadata = {}
 
-            try:
-                req.body = str(body.get('value', ''))
-                req.headers['content-type'] = body.get('mimetype',
-                                                       'text/plain')
-                req.headers[Consts.VALUE_ENCODING] = \
-                    body.get('valuetransferencoding', 'utf-8')
-            except KeyError:
-                return get_err_response('InvalidContent')
+                try:
+                    req.body = str(body.get('value', ''))
+                    req.headers['content-type'] = body.get('mimetype',
+                        'text/plain').lower()
+                    encoding = body.get('valuetransferencoding', 'utf-8')
+                    req.headers[Consts.VALUE_ENCODING] = encoding
+                    # if the value is encoded using base64, then
+                    # we need to decode it and save as binary
+                    if encoding == Consts.ENCODING_BASE64:
+                        req.body = base64.decodestring(req.body)
+                except KeyError:
+                    return get_err_response('InvalidContent')
         else:
             req.headers['content-length'] = '0'
 
@@ -204,7 +225,10 @@ class ObjectController(CDMIBaseController):
             body['parentURI'] = concat_parts(self.account_name,
                                              self.container_name,
                                              self.parent_name) + '/'
-            body['completionStatus'] = 'Complete'
+            if env.get('HTTP_X_USE_EXTRA_REQUEST'):
+                extra_res = self._put_manifest(env)
+                res.status_int = extra_res.status
+
             body['metadata'] = metadata
             res.body = json.dumps(body, indent=2)
         # Otherwise, no response body should be returned.
