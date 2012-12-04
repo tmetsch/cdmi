@@ -96,14 +96,21 @@ class ContainerController(CDMIBaseController):
         if res.status_int == 201:
             body = {}
             body['objectType'] = Consts.CDMI_APP_CONTAINER
-            body['objectName'] = self.object_name if self.object_name else \
-                self.container_name
+            body['objectName'] = (self.object_name + '/') if self.object_name \
+                else (self.container_name + '/')
             if self.object_name:
-                body['parentURI'] = concat_parts(self.account_name,
-                                                 self.container_name,
-                                                 self.parent_name) + '/'
+                body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                              self.account_name,
+                                              self.container_name,
+                                              self.parent_name, ''])
             else:
-                body['parentURI'] = self.account_name + '/'
+                body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                              self.account_name, ''])
+
+            body['capabilitiesURI'] = '/'.join(['', self.cdmi_root,
+                                                self.account_name,
+                                                self.cdmi_capability_id,
+                                                'container/'])
             body['completionStatus'] = 'Complete'
             body['metadata'] = metadata
             res.body = json.dumps(body, indent=2)
@@ -222,9 +229,16 @@ class ObjectController(CDMIBaseController):
             body = {}
             body['objectType'] = Consts.CDMI_APP_OBJECT
             body['objectName'] = self.object_name
-            body['parentURI'] = concat_parts(self.account_name,
-                                             self.container_name,
-                                             self.parent_name) + '/'
+            body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                          self.account_name,
+                                          self.container_name,
+                                          self.parent_name, ''])
+
+            body['capabilitiesURI'] = '/'.join(['', self.cdmi_root,
+                                               self.account_name,
+                                               self.cdmi_capability_id,
+                                               'dataobject/'])
+
             if env.get('HTTP_X_USE_EXTRA_REQUEST'):
                 extra_res = self._put_manifest(env)
                 res.status_int = extra_res.status

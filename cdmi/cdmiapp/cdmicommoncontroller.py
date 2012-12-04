@@ -19,6 +19,7 @@ from cdmiutils import \
     (get_pair_from_header, get_err_response, check_resource, send_manifest)
 from webob import Request, Response
 from swift.common.utils import get_logger
+from urlparse import parse_qs
 import json
 import base64
 import email
@@ -286,65 +287,22 @@ class CDMIBaseController(Controller):
 
 class CDMICommonController(CDMIBaseController):
     """
-    Handles container request.
-    This controller handles delete, get and capability requests for both
-    container and objects because there is no identifier to indicate if
-    a delete/capability request is for container or object, so for all
-    delete/capability request, this control will be handling the request.
-    Other than the delete, capability request, this controller will also
-    handle container creation, update and retrieval requests.
+    the base controller which handles entity read and delete
+    extended the controllers will handle other operations.
     """
 
-    def _capability(self, env, start_response):
-
-        res, is_container, headers, children = \
-            self._check_resource_attribute(env, start_response)
-
-        if res:
-            return res
-
-        res = Response()
-        res.status = 200
-        res.headers['Content-Type'] = Consts.CDMI_APP_CAPABILITY
-        res.headers[Consts.CDMI_VERSION] = Consts.CDMI_VERSION_VALUE
-
-        body = {}
-        body['objectType'] = Consts.CDMI_APP_CAPABILITY
-
-        if self.object_name:
-            body['parentURI'] = concat_parts(self.cdmi_capability_id,
-                                             self.account_name,
-                                             self.container_name,
-                                             self.parent_name) + '/'
-        else:
-            body['parentURI'] = concat_parts(self.cdmi_capability_id,
-                                             self.account_name) + '/'
-
-        body['capabilities'] = {}
-        if is_container:
-            if self.object_name:
-                body['objectName'] = self.object_name + '/'
-            else:
-                body['objectName'] = self.container_name + '/'
-
-            body['capabilities']['cdmi_list_children'] = True
-            body['capabilities']['cdmi_read_metadata'] = True
-            body['capabilities']['cdmi_modify_metadata'] = True
-            body['capabilities']['cdmi_create_dataobject'] = True
-            body['capabilities']['cdmi_delete_container'] = True
-            body['capabilities']['cdmi_create_container'] = True
-        else:
-            body['objectName'] = self.object_name
-            body['capabilities']['cdmi_read_value'] = True
-            body['capabilities']['cdmi_read_metadata'] = True
-            body['capabilities']['cdmi_modify_value'] = True
-            body['capabilities']['cdmi_modify_metadata'] = True
-            body['capabilities']['cdmi_delete_dataobject'] = True
-
-        res.body = json.dumps(body, indent=2)
-        return res
-
     def _read_object(self, env, start_response, headers):
+
+        query_string = env.get('QUERY_STRING', '').lower()
+        if len(query_string) > 0:
+            params = parse_qs(query_string, True, False)
+            new_qs = ''
+            for key, value in params.items():
+                if 'value:bytes' == key:
+                    env['HTTP_RANGE'] = 'bytes=' + ''.join(value)
+                else:
+                    new_qs += key + '=' + ''.join(value) + '&'
+            env['QUERY_STRING'] = new_qs
 
         req = Request(env)
         os_res = req.get_response(self.app)
@@ -367,13 +325,22 @@ class CDMICommonController(CDMIBaseController):
         # Setup required attributes for response body
         body['objectType'] = Consts.CDMI_APP_OBJECT
         body['objectName'] = self.object_name
-        body['parentURI'] = concat_parts(self.account_name,
-                                         self.parent_name) + '/'
-        body['capabilitiesURI'] = concat_parts(self.cdmi_capability_id,
-                                               self.account_name,
-                                               self.container_name,
-                                               self.parent_name,
-                                               self.object_name) + '/'
+
+        if self.parent_name != '':
+            body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                          self.account_name,
+                                          self.container_name,
+                                          self.parent_name, ''])
+        else:
+            body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                          self.account_name,
+                                          self.container_name, ''])
+
+        body['capabilitiesURI'] = '/'.join(['', self.cdmi_root,
+                                            self.account_name,
+                                            self.cdmi_capability_id,
+                                            'dataobject/'])
+
         body['completionStatus'] = 'Complete'
         body['metadata'] = {}
 
@@ -390,7 +357,7 @@ class CDMICommonController(CDMIBaseController):
             body['value'] = object_body
         body['valuerange'] = '0-' + str(len(object_body))
         res.body = json.dumps(body, indent=2)
-        res.status_int = 200
+        res.status_int = os_res.status_int
 
         return res
 
@@ -406,18 +373,24 @@ class CDMICommonController(CDMIBaseController):
         body['objectType'] = Consts.CDMI_APP_CONTAINER
         if self.object_name:
             body['objectName'] = self.object_name + '/'
-            body['parentURI'] = concat_parts(self.account_name,
-                                             self.container_name,
-                                             self.parent_name) + '/'
+            if self.parent_name != '':
+                body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                          self.account_name,
+                                          self.container_name,
+                                          self.parent_name, ''])
+            else:
+                body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                          self.account_name,
+                                          self.container_name, ''])
         else:
             body['objectName'] = self.container_name + '/'
-            body['parentURI'] = self.account_name + '/'
+            body['parentURI'] = '/'.join(['', self.cdmi_root,
+                                          self.account_name, ''])
 
-        body['capabilitiesURI'] = concat_parts(self.cdmi_capability_id,
-                                               self.account_name,
-                                               self.container_name,
-                                               self.parent_name,
-                                               self.object_name) + '/'
+        body['capabilitiesURI'] = '/'.join(['', self.cdmi_root,
+                                            self.account_name,
+                                            self.cdmi_capability_id,
+                                            'container/'])
         body['completionStatus'] = 'Complete'
         body['metadata'] = {}
 
@@ -450,7 +423,7 @@ class CDMICommonController(CDMIBaseController):
                     if tracking_device.get(child_name) is None:
                         tracking_device[child_name] = child_name
                         body['children'].append(child_name)
-
+        body['childrenRange'] = '0-' + str(len(body['children']))
         res.body = json.dumps(body, indent=2)
         res.status_int = 200
 
@@ -479,12 +452,7 @@ class CDMICommonController(CDMIBaseController):
         """
         Handle GET Container (List Objects) request
         """
-        # Create a new WebOb Request object according to the current request
-        accept_header = env.get('HTTP_ACCEPT', '')
-        if accept_header.find(Consts.CDMI_APP_CAPABILITY) >= 0:
-            return self._capability(env, start_response)
-        else:
-            return self._read_entity(env, start_response)
+        return self._read_entity(env, start_response)
 
     def DELETE(self, env, start_response):
         """
