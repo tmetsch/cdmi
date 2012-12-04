@@ -645,6 +645,7 @@ class TestCDMIContainer(unittest.TestCase):
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
+                   'Accept': 'application/cdmi-capability'}
         conn.request('GET', (self.cdmi_capability_root + '/' +
                              self.top_container + '/' +
                              self.child_container),
