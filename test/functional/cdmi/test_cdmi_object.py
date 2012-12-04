@@ -54,9 +54,9 @@ class TestCDMIObject(unittest.TestCase):
             self.os_access_root = '/v1/' + self.account_id
             self.access_root = ('/' + self.conf.get('cdmi_root', 'cdmi') +
                                 '/' + self.account_id)
-            self.cdmi_capability_root = ('/' +
-                                         self.conf.get('cdmi_capability_id',
-                                                       'cdmi_capabilities') +
+            self.cdmi_capability_root = ('/' + self.conf.get('cdmi_root',
+                                                             'cdmi') +
+                                         '/cdmi_capabilities' +
                                          '/' + self.account_id)
 
             #Setup two container names
@@ -1024,14 +1024,10 @@ class TestCDMIObject(unittest.TestCase):
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
-        print (self.cdmi_capability_root +'/' +
-               self.top_container +
-               '/' + self.child_container +
-               '/' + self.object_test)
         conn.request('GET', (self.cdmi_capability_root +'/' +
                              self.top_container +
                              '/' + self.child_container +
-                             '/' + self.object_test),
+                             '/' + self.object_test + '/'),
                      None, headers)
         res = conn.getresponse()
         self.assertEqual(res.status, 200, 'Object capability read failed')
