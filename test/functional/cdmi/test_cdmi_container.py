@@ -587,7 +587,6 @@ class TestCDMIContainer(unittest.TestCase):
         except Exception as parsing_error:
             raise parsing_error
         conn.close()
-        print body
         self.assertIsNotNone(body['capabilities'],
                              'No capabilities found')
         self.assertIsNotNone(body['parentURI'],
@@ -683,6 +682,7 @@ class TestCDMIContainer(unittest.TestCase):
         except Exception as parsing_error:
             raise parsing_error
         conn.close()
+        print body
         self.assertIsNotNone(body['capabilities'],
                              'No capabilities found')
         self.assertIsNotNone(body['parentURI'],
