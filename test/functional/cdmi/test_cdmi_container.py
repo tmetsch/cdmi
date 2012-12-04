@@ -575,7 +575,9 @@ class TestCDMIContainer(unittest.TestCase):
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
-        conn.request('GET', (self.cdmi_capability_root + self.top_container),
+        conn.request('GET', (self.cdmi_capability_root + '/' +
+                             self.top_container + '/' +
+                             self.child_container),
                      None, headers)
         res = conn.getresponse()
         self.assertEqual(res.status, 200, "Container capability read failed")
