@@ -1,4 +1,5 @@
 # Copyright (c) 2010-2011 IBM.
+# Copyright (c) 2012 Intel Performance Learning Solutions Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

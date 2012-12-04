@@ -1,4 +1,5 @@
 # Copyright (c) 2010-2011 IBM.
+# Copyright (c) 2012 Intel Performance Learning Solutions Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +19,8 @@ from test_utils import get_config, get_auth
 import httplib
 import time
 import json
+
+SWIFT_HOST = 'localhost'
 
 
 class TestCDMIContainer(unittest.TestCase):
@@ -93,7 +96,7 @@ class TestCDMIContainer(unittest.TestCase):
         return path.lstrip('/')
 
     def __create_test_container(self, container_name):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'content-type': 'application/directory',
@@ -104,7 +107,7 @@ class TestCDMIContainer(unittest.TestCase):
         self.assertEqual(res.status, 201, "Test Container creation failed")
 
     def __delete_test_container(self, container_name):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('DELETE', self.os_access_root + '/' + container_name,
@@ -112,7 +115,7 @@ class TestCDMIContainer(unittest.TestCase):
         res = conn.getresponse()
 
     def test_create_child_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -133,7 +136,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_create_child_container_in_virtual_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -154,7 +157,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_create_child_container_no_header(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -170,7 +173,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_create_child_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token, 'content-length': '0'}
         conn.request('PUT', (self.access_root + '/' + self.top_container +
@@ -181,7 +184,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_create_child_container_in_virtual_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('PUT', (self.access_root + '/' + self.top_container +
@@ -191,7 +194,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_create_grandchild_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token, 'content-length': '0'}
         non_exist_child_container = \
@@ -205,7 +208,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_create_top_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -235,7 +238,7 @@ class TestCDMIContainer(unittest.TestCase):
                          "objectType must be application/cdmi-container")
 
     def test_create_top_container_with_empty_body(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -264,7 +267,7 @@ class TestCDMIContainer(unittest.TestCase):
                          "objectType must be application/cdmi-container")
 
     def test_create_top_container_without_body(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -292,7 +295,7 @@ class TestCDMIContainer(unittest.TestCase):
                          "objectType must be application/cdmi-container")
 
     def test_create_top_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token, 'content-length': '0'}
         conn.request('PUT', (self.access_root + '/' +
@@ -303,7 +306,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_read_top_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -329,7 +332,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType must be application/cdmi-container')
 
     def test_read_top_account_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -356,7 +359,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType must be application/cdmi-container')
 
     def test_read_top_account_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', self.access_root + '/', None, headers)
@@ -365,7 +368,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_read_top_non_exist_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -377,7 +380,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_read_top_container_with_wrong_version(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '4.x.1',
@@ -389,7 +392,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_read_top_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', (self.access_root + '/' + self.top_container +
@@ -404,7 +407,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_read_top_non_exist_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', (self.access_root + '/' + 'cdmi_test_not_exist_' +
@@ -414,7 +417,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_read_child_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -440,7 +443,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType must be application/cdmi-container')
 
     def test_read_virtual_child_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -466,7 +469,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType must be application/cdmi-container')
 
     def test_read_virtual_child_container_without_header_trailing_slash(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -476,7 +479,7 @@ class TestCDMIContainer(unittest.TestCase):
         self.assertEqual(res.status, 409, 'Container read should have failed')
 
     def test_read_virtual_child_container_wo_header_w_trailing_slash(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -501,7 +504,7 @@ class TestCDMIContainer(unittest.TestCase):
                          "objectType must be application/cdmi-container")
 
     def test_read_non_exist_child_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -514,7 +517,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_read_child_container_no_header(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -525,7 +528,7 @@ class TestCDMIContainer(unittest.TestCase):
                          "The read operation should have failed")
 
     def test_read_child_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', (self.access_root + '/' + self.top_container +
@@ -549,7 +552,7 @@ class TestCDMIContainer(unittest.TestCase):
                          "objectType must be application/cdmi-container")
 
     def test_read_child_container_non_cdmi_without_trailing_slash(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', (self.access_root + '/' + self.top_container +
@@ -558,7 +561,7 @@ class TestCDMIContainer(unittest.TestCase):
         self.assertEqual(res.status, 409, 'Container read should have failed')
 
     def test_read_non_exist_child_container_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', (self.access_root + '/' + self.top_container +
@@ -570,7 +573,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_child_container_capability_with_prefix(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -596,7 +599,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType should be application/cdmi-capability.')
 
     def test_child_virtual_container_capability(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -622,7 +625,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType should be application/cdmi-capability.')
 
     def test_non_exist_child_container_capability(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -636,7 +639,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_top_container_capability_with_header_prefix(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -662,7 +665,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType should be application/cdmi-capability.')
 
     def test_system_capability(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -687,7 +690,7 @@ class TestCDMIContainer(unittest.TestCase):
                          'objectType should be application/cdmi-capability.')
 
     def test_update_top_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -702,7 +705,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_update_child_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -718,7 +721,7 @@ class TestCDMIContainer(unittest.TestCase):
         conn.close()
 
     def test_update_virtual_child_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -734,7 +737,7 @@ class TestCDMIContainer(unittest.TestCase):
 
     def test_delete_child_container(self):
         #Delete the child container first
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -746,7 +749,7 @@ class TestCDMIContainer(unittest.TestCase):
 
     def test_delete_virtual_child_container(self):
         #Delete the child container first
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -759,7 +762,7 @@ class TestCDMIContainer(unittest.TestCase):
 
     def test_delete_child_container_non_cdmi(self):
         #Delete the child container first
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('DELETE', (self.access_root + '/' + self.top_container +
@@ -771,7 +774,7 @@ class TestCDMIContainer(unittest.TestCase):
 
     def test_delete_top_container(self):
         #Delete the child container first
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -783,7 +786,7 @@ class TestCDMIContainer(unittest.TestCase):
 
     def test_delete_top_non_exist_container(self):
         #Delete the child container first
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -797,7 +800,7 @@ class TestCDMIContainer(unittest.TestCase):
 
     def test_delete_top_container_non_cdmi(self):
         #Delete the child container first
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('DELETE', (self.access_root + '/' +
@@ -809,7 +812,7 @@ class TestCDMIContainer(unittest.TestCase):
 
     def test_delete_top_non_exist_container_non_cdmi(self):
         #Delete the child container first
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('DELETE', (self.access_root + '/' +

@@ -1,4 +1,5 @@
 # Copyright (c) 2010-2011 IBM.
+# Copyright (c) 2012 Intel Performance Learning Solutions Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +26,8 @@ import json
 import base64
 import os
 
+SWIFT_HOST = 'localhost'
+
 
 class TestCDMIObject(unittest.TestCase):
     """ Test CDMI ContainerController """
@@ -37,7 +40,7 @@ class TestCDMIObject(unittest.TestCase):
 
         try:
             self.conf = get_config()['func_test']
-            auth_host = 'localhost'
+            auth_host = self.conf.get('auth_host')
             auth_port = self.conf.get('auth_port')
             access_port = self.conf.get('access_port')
             auth_url = self.conf.get('auth_prefix')
@@ -52,11 +55,10 @@ class TestCDMIObject(unittest.TestCase):
             self.access_root = ('/' + self.conf.get('cdmi_root', 'cdmi') +
                                 '/' + self.account_id)
             self.cdmi_capability_root = ('/' +
-                                         self.conf.get('cdmi_root', 'cdmi') +
-                                         '/' +
-                                         self.account_id + '/' +
                                          self.conf.get('cdmi_capability_id',
-                                                       'cdmi_capabilities'))
+                                                       'cdmi_capabilities') +
+                                         '/' + self.account_id)
+
             #Setup two container names
             suffix = format(time.time(), '.6f')
             self.top_container = 'cdmi_test_top_container_' + suffix
@@ -100,7 +102,7 @@ class TestCDMIObject(unittest.TestCase):
         self.__delete_test_entity(self.top_container)
 
     def __create_test_container(self, container_path):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'content-type': 'application/directory',
@@ -111,7 +113,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 201, 'Test Container creation failed')
 
     def __create_test_object(self, object_path):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('PUT', self.os_access_root + '/' + object_path,
@@ -120,7 +122,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 201, 'Test Object creation failed')
 
     def __delete_test_entity(self, entity_path):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('DELETE', self.os_access_root + '/' + entity_path,
@@ -128,7 +130,7 @@ class TestCDMIObject(unittest.TestCase):
         res = conn.getresponse()
 
     def test_create_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -157,7 +159,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_create_object_cdmi_multipart(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -198,7 +200,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
         # now read the object and make sure everything is correct.
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', (self.access_root + '/' + self.top_container +
@@ -211,7 +213,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
     def test_create_object_non_cdmi_multipart(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'Content-Type': 'multipart/mixed'}
@@ -233,7 +235,7 @@ class TestCDMIObject(unittest.TestCase):
 
         conn.close()
         # now read the object and make sure everything is correct.
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -260,7 +262,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
     def test_copy_object_same_dir(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -288,7 +290,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_copy_object_different_dir(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -316,7 +318,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_copy_object_non_exist(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -335,7 +337,7 @@ class TestCDMIObject(unittest.TestCase):
 
     def test_handle_base64_object(self):
         # create a new object using base64 encoded data
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -368,7 +370,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
         # read the object just created.
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -394,7 +396,7 @@ class TestCDMIObject(unittest.TestCase):
 
     def test_large_data_upload_cdmi(self):
         # create the first request
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -431,7 +433,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
         # create the second request
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -469,7 +471,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
         # read the object just created.
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -496,7 +498,7 @@ class TestCDMIObject(unittest.TestCase):
 
     def test_large_data_upload_non_cdmi(self):
         # create the first request
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-UploadID': 'test_l_id_01',
@@ -517,7 +519,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
         # create the second request
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-UploadID': 'test_l_id_01',
@@ -537,7 +539,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
         # read the object just created.
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('GET', (self.access_root + '/' + self.top_container +
@@ -553,7 +555,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
     def test_create_object_with_empty_body(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -579,7 +581,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_create_object_without_body(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -603,7 +605,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_create_object_in_virtual_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -631,7 +633,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_create_object_in_virtual_container_with_conflict_name(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -648,7 +650,7 @@ class TestCDMIObject(unittest.TestCase):
                          'Object creation should have failed')
 
     def test_create_object_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         body = 'value of the object'
@@ -659,7 +661,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 201, 'Non-CDMI Object creation failed')
 
     def test_create_object_invalid_body(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -673,7 +675,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 400, 'Object creation should have failed')
 
     def test_create_object_no_parent(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -694,7 +696,7 @@ class TestCDMIObject(unittest.TestCase):
                          'Object creation should have failed')
 
     def test_create_object_exists_as_parent(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -711,7 +713,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 409, 'Object creation should have failed')
 
     def test_read_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -734,7 +736,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_partial_cdmi_read_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -758,7 +760,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_partial_cdmi_read_query_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -782,7 +784,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_partial_noncdmi_read_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'Range': 'bytes=1-5'}
@@ -796,7 +798,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertIsNotNone(data, 'Partial read has failed')
 
     def test_partial_noncdmi_read_query_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
 
@@ -810,7 +812,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertIsNotNone(data, 'Partial read has failed')
 
     def test_read_object_with_header_with_trailing_slash(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -822,7 +824,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 409, 'Object read should have failed')
 
     def test_read_object_without_accept_header(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -844,7 +846,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_read_object_in_virtual_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -866,7 +868,7 @@ class TestCDMIObject(unittest.TestCase):
                              'Not objectType found which is required.')
 
     def test_read_object_with_wrong_version(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '4.x.x1',
@@ -879,7 +881,7 @@ class TestCDMIObject(unittest.TestCase):
         conn.close()
 
     def test_read_non_exist_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -892,7 +894,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 404, 'Object read should have failed')
 
     def test_read_non_exist_object_in_virtual_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -904,7 +906,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 404, 'Object read should have failed')
 
     def test_update_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -921,7 +923,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertIn(res.status, [201, 202, 204], 'Object update failed')
 
     def test_update_object_in_virtual_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -936,7 +938,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertIn(res.status, [201, 202, 204], 'Object update failed')
 
     def test_delete_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -947,7 +949,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 204, 'object deletion failed')
 
     def test_delete_object_in_virtual_container(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -957,7 +959,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 204, 'object deletion failed')
 
     def test_delete_object_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('DELETE', (self.access_root + '/' + self.top_container +
@@ -967,7 +969,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 204, 'object deletion failed')
 
     def test_delete_non_exist_object(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
@@ -979,7 +981,7 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 404, 'object deletion should have failed')
 
     def test_delete_non_exist_object_non_cdmi(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token}
         conn.request('DELETE', (self.access_root + '/' + self.top_container +
@@ -990,12 +992,15 @@ class TestCDMIObject(unittest.TestCase):
         self.assertEqual(res.status, 404, 'object deletion should have failed')
 
     def test_object_capability_with_header(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
                    'Accept': 'application/cdmi-capability'}
-        conn.request('GET', (self.cdmi_capability_root + '/dataobject/'),
+        conn.request('GET', (self.access_root + '/' +
+                             self.top_container +
+                             '/' + self.child_container +
+                             '/' + self.object_test),
                      None, headers)
         res = conn.getresponse()
         self.assertEqual(res.status, 200, 'Object capability read failed')
@@ -1015,12 +1020,19 @@ class TestCDMIObject(unittest.TestCase):
                          'objectType should be application/cdmi-capability.')
 
     def test_object_capability_with_prefix_no_header(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
-        conn.request('GET', (self.cdmi_capability_root +
-                             '/dataobject'), None, headers)
+        print (self.cdmi_capability_root +'/' +
+               self.top_container +
+               '/' + self.child_container +
+               '/' + self.object_test)
+        conn.request('GET', (self.cdmi_capability_root +'/' +
+                             self.top_container +
+                             '/' + self.child_container +
+                             '/' + self.object_test),
+                     None, headers)
         res = conn.getresponse()
         self.assertEqual(res.status, 200, 'Object capability read failed')
         data = res.read()
@@ -1040,7 +1052,7 @@ class TestCDMIObject(unittest.TestCase):
                          'objectType should be application/cdmi-capability.')
 
     def test_non_exist_object_capability(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1',
@@ -1054,7 +1066,7 @@ class TestCDMIObject(unittest.TestCase):
                          'Object capability read should have failed')
 
     def test_non_exist_object_capability_with_prefix(self):
-        conn = httplib.HTTPConnection('localhost',
+        conn = httplib.HTTPConnection(SWIFT_HOST,
                                       self.conf.get('access_port'))
         headers = {'X-Auth-Token': self.auth_token,
                    'X-CDMI-Specification-Version': '1.0.1'}
